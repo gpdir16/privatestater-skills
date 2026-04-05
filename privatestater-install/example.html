@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrivateStater Integration Example</title>
+
+  <!--
+    STEP 1: Install PrivateStater (required for all features)
+    - PrivateStaterConfig must come before privatestater.js
+    - Analytics starts collecting automatically after these two lines
+    - window.PrivateStater is available anywhere after this script loads
+  -->
+  <script>window.PrivateStaterConfig = { prstSite: "YOUR_SITE_ID" };</script>
+  <script src="https://privatestater.com/privatestater.js"></script>
+
+</head>
+<body>
+
+  <h1>My Website</h1>
+  <p>Welcome! Check out our features.</p>
+
+  <!--
+    STEP 2: Analytics — click event tracking
+    - Both onclick and addEventListener patterns work
+    - Traffic source tracking uses URL params only, no extra code needed
+      e.g. https://example.com?src=newsletter  or  ?utm_source=google
+  -->
+  <button onclick="window.PrivateStater.statsClick('hero_cta')">
+    Get Started
+  </button>
+
+  <hr>
+
+  <!--
+    STEP 3: Captcha — HTML widget (recommended method)
+    Prerequisite: Dashboard -> Website -> Captcha -> Settings -> Enable Captcha
+    - The widget renders automatically inside the div with data-captcha="prst"
+    - The token must also be validated on the server side (single-use, expires in 5 min)
+  -->
+  <form id="contact-form">
+    <input type="text" name="name" placeholder="Your name" required>
+    <input type="email" name="email" placeholder="Your email" required>
+
+    <!-- Captcha token — filled by onPrivateStaterCaptchaSuccess, sent to server -->
+    <input type="hidden" id="captcha-token" name="captchaToken">
+
+    <!-- Captcha widget renders here -->
+    <div data-captcha="prst"></div>
+
+    <button type="submit">Send Message</button>
+  </form>
+
+  <hr>
+
+  <!--
+    STEP 4: Feedback Widget
+    Prerequisite: Dashboard -> Website -> Feedback -> Settings -> Enable Feedback
+    - Once enabled, a floating button appears automatically — no HTML needed
+    - The button below is an optional custom trigger
+  -->
+  <button id="open-feedback">Give Feedback</button>
+
+  <!--
+    All window.PrivateStater calls must come after privatestater.js in the HTML.
+    Since it is loaded synchronously in <head>, it is available anywhere in <body>.
+  -->
+  <script>
+    // Captcha: store token in hidden input on success
+    window.onPrivateStaterCaptchaSuccess = function(token) {
+      document.getElementById('captcha-token').value = token;
+    };
+
+    // Captcha: handle error
+    window.onPrivateStaterCaptchaError = function(error) {
+      alert('Captcha verification failed. Please try again.');
+    };
+
+    // Feedback: open widget from a custom button
+    document.getElementById('open-feedback').addEventListener('click', function() {
+      window.PrivateStater.showFeedback();
+    });
+
+    // Captcha: AJAX form submission (optional — use instead of a regular form submit)
+    document.getElementById('contact-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const captchaToken = document.getElementById('captcha-token').value;
+      if (!captchaToken) {
+        alert('Please complete the captcha first.');
+        return;
+      }
+
+      const form = e.currentTarget;
+      const res = await fetch('/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.elements['name'].value,
+          email: form.elements['email'].value,
+          captchaToken
+        })
+      });
+
+      if (res.ok) {
+        alert('Message sent!');
+        form.reset();
+        // Token is single-use — clear it after submit
+        document.getElementById('captcha-token').value = '';
+      }
+    });
+  </script>
+
+  <!--
+    Server-side reference (Node.js/Express) — not part of this HTML file:
+
+    app.post('/submit', async (req, res) => {
+      const result = await fetch('https://privatestater.com/api/captcha/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websiteId: 'YOUR_SITE_ID', verifyToken: req.body.captchaToken })
+      }).then(r => r.json());
+
+      if (!result.success) return res.status(400).json({ error: 'Captcha failed' });
+      // proceed with request handling...
+    });
+  -->
+
+</body>
+</html>
