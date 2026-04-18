@@ -15,7 +15,6 @@ Every feedback object in list responses has this structure:
   "id": "664fabc123def456",
   "createdAt": "2026-04-01T10:00:00Z",
   "status": "unread",
-  "category": "issue",
   "rating": 3,
   "text": "The login page is broken on mobile.",
   "email": "user@example.com",
@@ -37,7 +36,6 @@ Every feedback object in list responses has this structure:
 | `id` | string | Unique feedback ID — use this for PATCH, DELETE, screenshot, and console-log requests |
 | `createdAt` | ISO 8601 string | When the feedback was submitted |
 | `status` | string | Workflow status — see Status Workflow below |
-| `category` | string | `"issue"` / `"idea"` / `"other"` — selected by the user |
 | `rating` | number (1–5) | Emoji rating (1 = worst, 5 = best). `null` if rating was disabled or skipped |
 | `text` | string | Written feedback message. Empty string if text was disabled or skipped |
 | `email` | string | User-provided email. Empty string if not provided or email collection is disabled |
@@ -79,7 +77,11 @@ Returns the current feedback widget configuration.
       "allowLocalhost": false,
       "textEnabled": true,
       "ratingEnabled": true,
+      "screenshotEnabled": true,
       "emailEnabled": false,
+      "emailDigestEnabled": true,
+      "deviceInfoAnalyticsEnabled": true,
+      "consoleLogsEnabled": true,
       "widgetPosition": "bottom-right",
       "primaryColor": "#6366f1",
       "textColor": "#ffffff",
@@ -97,7 +99,11 @@ Returns the current feedback widget configuration.
 | `allowLocalhost` | boolean | `false` | Allows the widget to load on `localhost` for local testing |
 | `textEnabled` | boolean | `true` | Shows the free-text input field in the widget |
 | `ratingEnabled` | boolean | `true` | Shows the emoji rating step in the widget |
+| `screenshotEnabled` | boolean | `true` | Allows users to attach a screenshot to their feedback |
 | `emailEnabled` | boolean | `false` | Shows the optional email input field in the widget |
+| `emailDigestEnabled` | boolean | `true` | Sends a periodic email digest summarizing new feedback |
+| `deviceInfoAnalyticsEnabled` | boolean | `true` | Collects browser, device type, and language with user consent |
+| `consoleLogsEnabled` | boolean | `true` | Captures browser console logs at the time of submission |
 | `widgetPosition` | string | `"bottom-right"` | `"bottom-right"` or `"bottom-left"` — floating button position |
 | `primaryColor` | string | `""` | Hex color for the widget button (e.g. `"#6366f1"`). Empty string = default |
 | `textColor` | string | `""` | Hex color for button text. Empty string = default |
@@ -116,7 +122,11 @@ Updates feedback widget settings. All fields are optional — only include what 
   "allowLocalhost": false,
   "textEnabled": true,
   "ratingEnabled": true,
+  "screenshotEnabled": true,
   "emailEnabled": false,
+  "emailDigestEnabled": true,
+  "deviceInfoAnalyticsEnabled": true,
+  "consoleLogsEnabled": true,
   "widgetPosition": "bottom-left",
   "primaryColor": "#6366f1",
   "textColor": "#ffffff",
@@ -141,6 +151,8 @@ await fetch(
 );
 ```
 
+**Validation note**: If `enabled` is `true`, at least one of `textEnabled`, `ratingEnabled`, or `screenshotEnabled` must remain `true`. Otherwise the API returns `400` with `feedback_no_content_field`.
+
 ---
 
 ## GET `/websites/:websiteId/feedbacks`
@@ -153,7 +165,7 @@ Returns a paginated, filterable list of feedback items.
 |-------|------|---------|-------------|
 | `range` | string | `"7d"` | `"1d"` / `"7d"` / `"30d"` / `"all"` |
 | `status` | string | (all except blocked) | Filter by status: `"unread"` / `"in_progress"` / `"completed"` / `"blocked"` |
-| `category` | string | (all) | Filter by category: `"issue"` / `"idea"` / `"other"` |
+| `searchText` | string | `""` | Text search across `text` and `email` fields (max 200 chars) |
 | `page` | number | `1` | Page number (1-indexed) |
 | `limit` | number | `20` | Items per page (max `100`) |
 
@@ -180,10 +192,10 @@ Returns a paginated, filterable list of feedback items.
 
 **Answer format**: "You have **142 feedbacks** total (**34 unread**). Showing page 1 of 8."
 
-**Example — fetch all unread bug reports**:
+**Example — fetch all unread feedback from the last 7 days**:
 ```javascript
 const res = await fetch(
-  `https://privatestater.com/oapi/feedback/websites/${websiteId}/feedbacks?status=unread&category=issue&range=7d&limit=50`,
+  `https://privatestater.com/oapi/feedback/websites/${websiteId}/feedbacks?status=unread&range=7d&limit=50`,
   { headers: { 'Authorization': `Bearer ${apiKey}` } }
 );
 const { data, meta } = await res.json();
@@ -283,10 +295,10 @@ Updates the status of up to **100 feedback items** in a single request.
 
 > Response key is `modifiedCount` (not `updatedCount`).
 
-**Example — auto-triage all unread bug reports to in_progress**:
+**Example — mark all unread feedback as in_progress**:
 ```javascript
 const listRes = await fetch(
-  `https://privatestater.com/oapi/feedback/websites/${websiteId}/feedbacks?status=unread&category=issue&limit=100`,
+  `https://privatestater.com/oapi/feedback/websites/${websiteId}/feedbacks?status=unread&limit=100`,
   { headers: { 'Authorization': `Bearer ${apiKey}` } }
 );
 const { data } = await listRes.json();
